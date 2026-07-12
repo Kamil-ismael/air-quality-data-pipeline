@@ -1,0 +1,23 @@
+# Secrets — ne JAMAIS committer de clé API ou d'identifiants de base de données
+.env
+.env.*
+*.key
+secrets.json
+
+# Environnement Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Notebooks — checkpoints Jupyter/Colab
+.ipynb_checkpoints/
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Éditeurs
+.vscode/
+.idea/
