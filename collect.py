@@ -45,15 +45,19 @@ def run() -> int:
 
     for city_name, coords in CITIES.items():
         try:
-            data = fetch_city_data(city_name, coords["latitude"],
-                                   coords["longitude"])
+            data = fetch_city_data(
+                city_name, coords["latitude"], coords["longitude"]
+            )
             filepath = save_raw(city_name, data)
             print(f"  [OK] {city_name} -> {filepath}")
         except requests.exceptions.RequestException as exc:
             print(f"  [ERREUR] {city_name}: {exc}")
             errors += 1
 
-    print(f"=== Terminé : {len(CITIES) - errors}/{len(CITIES)} villes collectées ===")
+    print(
+        f"=== Terminé : {len(CITIES) - errors}/{len(CITIES)} "
+        f"villes collectées ==="
+    )
     return 1 if errors == len(CITIES) else 0
 
 

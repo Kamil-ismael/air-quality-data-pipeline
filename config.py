@@ -1,9 +1,19 @@
 CITIES = {
-    "Antananarivo": {"latitude": -18.8792, "longitude": 47.5079, "country": "Madagascar"},
-    "Toamasina":    {"latitude": -18.1492, "longitude": 49.4023, "country": "Madagascar"},
-    "Mahajanga":    {"latitude": -15.7167, "longitude": 46.3167, "country": "Madagascar"},
-    "Fianarantsoa": {"latitude": -21.4536, "longitude": 47.0854, "country": "Madagascar"},
-    "Antsiranana":  {"latitude": -12.2787, "longitude": 49.2917, "country": "Madagascar"},
+    "Antananarivo": {
+        "latitude": -18.8792, "longitude": 47.5079, "country": "Madagascar"
+    },
+    "Toamasina": {
+        "latitude": -18.1492, "longitude": 49.4023, "country": "Madagascar"
+    },
+    "Mahajanga": {
+        "latitude": -15.7167, "longitude": 46.3167, "country": "Madagascar"
+    },
+    "Fianarantsoa": {
+        "latitude": -21.4536, "longitude": 47.0854, "country": "Madagascar"
+    },
+    "Antsiranana": {
+        "latitude": -12.2787, "longitude": 49.2917, "country": "Madagascar"
+    },
 }
 
 HOURLY_VARIABLES = [
