@@ -1,0 +1,41 @@
+name: Collecte AQI horaire
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le repo
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Lancer la collecte horaire
+        run: python collect.py
+
+      - name: Reconstruire clean/ depuis raw/
+        run: python clean.py
+
+      - name: Valider le dataset clean
+        run: python validate_clean.py
+
+      - name: Commit et push des nouvelles données
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add raw/ clean/
+          git diff --staged --quiet || git commit -m "Collecte automatique $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          git push
