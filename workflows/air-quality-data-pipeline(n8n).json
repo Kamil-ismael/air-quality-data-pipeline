@@ -64,7 +64,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const fs = require('fs');\nconst path = require('path');\n\nconst items = $input.all();\nconst villesItems = $('city').all();\n\nconst baseDir = 'C:\\\\Users\\\\USER\\\\n8n-datalake\\\\raw';\n\nreturn items.map((item, index) => {\n  const city = villesItems[index].json.city.trim();\n  const now = new Date();\n  const timestamp = now.toISOString().replace(/[:.]/g, '-');\n\n  const year = now.getFullYear();\n  const month = String(now.getMonth() + 1).padStart(2, '0');\n  const day = String(now.getDate()).padStart(2, '0');\n\n  const dirPath = path.join(baseDir, city, String(year), month, day);\n  fs.mkdirSync(dirPath, { recursive: true });\n\n  const fileName = `${city}_${timestamp}.json`;\n  const fullPath = path.join(dirPath, fileName);\n\n  const rawRecord = {\n    city: city,\n    ingestion_timestamp: now.toISOString(),\n    raw_payload: item.json\n  };\n\n  fs.writeFileSync(fullPath, JSON.stringify(rawRecord, null, 2), 'utf-8');\n\n  return {\n    json: {\n      fullPath: fullPath,\n      city: city,\n      raw_payload: item.json\n    }\n  };\n});"
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\n\nconst items = $input.all();\nconst villesItems = $('city').all();\n\nreturn items.map((item, index) => {\n  const cityData = villesItems[index].json;\n  const city = cityData.city.trim();\n  const baseDir = cityData.baseDir;\n\n  const now = new Date();\n  const timestamp = now.toISOString().replace(/[:.]/g, '-');\n\n  const year = now.getFullYear();\n  const month = String(now.getMonth() + 1).padStart(2, '0');\n  const day = String(now.getDate()).padStart(2, '0');\n\n  const dirPath = path.join(baseDir, city, String(year), month, day);\n  fs.mkdirSync(dirPath, { recursive: true });\n\n  const fileName = `${city}_${timestamp}.json`;\n  const fullPath = path.join(dirPath, fileName);\n\n  const rawRecord = {\n    city: city,\n    ingestion_timestamp: now.toISOString(),\n    raw_payload: item.json\n  };\n\n  fs.writeFileSync(fullPath, JSON.stringify(rawRecord, null, 2), 'utf-8');\n\n  return {\n    json: {\n      fullPath: fullPath,\n      city: city,\n      raw_payload: item.json\n    }\n  };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -90,7 +90,7 @@
     },
     {
       "parameters": {
-        "jsCode": "return [\n  { city: \"Antananarivo\", lat: -18.8792, lon: 47.5079 },\n  { city: \"Toamasina\", lat: -18.1492, lon: 49.4023 },\n  { city: \"Mahajanga\", lat: -15.7167, lon: 46.3167 },\n  { city: \"Fianarantsoa\", lat: -21.4536, lon: 47.0858 },\n  { city: \"Antsiranana\", lat: -12.2793, lon: 49.2917 }\n].map(item => ({ json: item }));"
+        "jsCode": "const config = {\n  baseDir: 'C:\\\\n8n-datalake\\\\raw'  // ⚠️ Chaque collaborateur adapte SEULEMENT cette ligne\n};\n\nreturn [\n  { city: \"Antananarivo\", lat: -18.8792, lon: 47.5079, baseDir: config.baseDir },\n  { city: \"Toamasina\", lat: -18.1492, lon: 49.4023, baseDir: config.baseDir },\n  { city: \"Mahajanga\", lat: -15.7167, lon: 46.3167, baseDir: config.baseDir },\n  { city: \"Fianarantsoa\", lat: -21.4536, lon: 47.0858, baseDir: config.baseDir },\n  { city: \"Antsiranana\", lat: -12.2793, lon: 49.2917, baseDir: config.baseDir }\n].map(item => ({ json: item }));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -155,7 +155,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "bf264e73-1eaa-47b5-8086-9891a0eb92a2",
+  "versionId": "21e61ac1-90dd-4119-83a1-ab1c55ad3096",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "534bdca62cc21f547eb3c499fa7992706e8fa71e540eb3b2b10e201095615f8e"
