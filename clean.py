@@ -80,3 +80,4 @@ def build_clean_dataset(
     print(f"Colonnes : {len(df.columns)}")
     return df
 if __name__ == "__main__":
+    build_clean_dataset()
