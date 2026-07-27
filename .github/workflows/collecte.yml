@@ -2,40 +2,47 @@ name: Collecte AQI horaire
 
 on:
   schedule:
-    - cron: '0 * * * *'
-  workflow_dispatch:
+    - cron: "0 * * * *"  
+  workflow_dispatch: {}    
 
 permissions:
   contents: write
 
 jobs:
-  collect:
+  collect-and-load:
     runs-on: ubuntu-latest
     steps:
-      - name: Récupérer le repo
+      - name: Checkout du repo
         uses: actions/checkout@v4
 
-      - name: Installer Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.11"
 
-      - name: Installer les dépendances
+      - name: Installation des dépendances
         run: pip install -r requirements.txt
 
-      - name: Lancer la collecte horaire
-        run: python collect.py
+      - name: Collecte horaire (raw/)
+        working-directory: src
+        env:
+          OWM_API_KEY: ${{ secrets.OWM_API_KEY }}
+        run: python fetch_current.py
 
-      - name: Reconstruire clean/ depuis raw/
-        run: python clean.py
+      - name: Reconstruction de clean/
+        working-directory: src
+        run: python build_clean.py
 
-      - name: Valider le dataset clean
-        run: python validate_clean.py
+      - name: Chargement du warehouse
+        working-directory: src
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python load_warehouse.py
 
-      - name: Commit et push des nouvelles données
+      - name: Commit des nouvelles données
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add raw/ clean/
-          git diff --staged --quiet || git commit -m "Collecte automatique $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          git config user.name "aqi-bot"
+          git config user.email "aqi-bot@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet || git commit -m "chore: collecte AQI $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           git push
