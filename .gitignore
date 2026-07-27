@@ -18,6 +18,7 @@ env/
 .DS_Store
 Thumbs.db
 /raw
+/clean
 
 # Éditeurs
 .vscode/
