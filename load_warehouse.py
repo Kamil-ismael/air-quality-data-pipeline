@@ -1,61 +1,12 @@
 import os
-import csv
 import sys
 from datetime import datetime
+
+import pandas as pd
 import psycopg2
+from psycopg2.extras import execute_values
 
 from config import CITIES
-
-DAYS_FR = None  # on garde les noms de jours en anglais (standard, sans accent)
-
-
-def get_or_create_city(cur, city_name):
-    """
-    Récupère l'id de la ville, la crée si elle n'existe pas encore.
-    Utilise ON CONFLICT pour être atomique : pas de SELECT puis INSERT
-    séparés qui pourraient planter la transaction entre les deux.
-    """
-    city_name = city_name.strip()
-    info = CITIES.get(city_name)
-    if not info:
-        raise ValueError(f"Ville '{city_name}' non trouvée dans CITIES (config.py).")
-
-    cur.execute(
-        """
-        INSERT INTO dim_city (city_name, country, latitude, longitude)
-        VALUES (%s, %s, %s, %s)
-        ON CONFLICT (city_name) DO UPDATE
-            SET city_name = EXCLUDED.city_name
-        RETURNING id_city
-        """,
-        (city_name, info["country"], info["latitude"], info["longitude"]),
-    )
-    return cur.fetchone()[0]
-
-
-def get_or_create_time(cur, dt: datetime):
-    """
-    Récupère l'id de la ligne dim_time pour cet horodatage, la crée sinon.
-    Une ligne = une heure précise (pas juste un jour).
-    """
-    day_of_week = dt.strftime("%A")       # ex: 'Monday'
-    is_weekend = dt.weekday() >= 5        # 5 = samedi, 6 = dimanche
-
-    cur.execute(
-        """
-        INSERT INTO dim_time (
-            full_datetime, date, hour, day, month, year, day_of_week, is_weekend
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (full_datetime) DO UPDATE
-            SET full_datetime = EXCLUDED.full_datetime
-        RETURNING id_time
-        """,
-        (
-            dt, dt.date(), dt.hour, dt.day, dt.month, dt.year,
-            day_of_week, is_weekend,
-        ),
-    )
-    return cur.fetchone()[0]
 
 
 def load_warehouse(csv_path):
@@ -68,74 +19,139 @@ def load_warehouse(csv_path):
         print("[ERREUR] DATABASE_URL non définie.")
         sys.exit(1)
 
+    print("Lecture du CSV...")
+    df = pd.read_csv(csv_path)
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    print(f"  {len(df)} lignes lues.")
+
     conn = psycopg2.connect(database_url)
     cur = conn.cursor()
-    total = 0
-    ignores = 0
-    erreurs = 0
 
     try:
-        with open(csv_path, "r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            print(f"Colonnes du CSV : {reader.fieldnames}")
+        # ------------------------------------------------------------
+        # 1) Villes : il n'y en a que quelques-unes, upsert direct
+        # ------------------------------------------------------------
+        print("Chargement des villes...")
+        city_rows = []
+        for city_name in df["city"].unique():
+            info = CITIES.get(city_name.strip())
+            if not info:
+                print(f"  [ATTENTION] Ville inconnue ignorée : {city_name}")
+                continue
+            city_rows.append((city_name, info["country"], info["latitude"], info["longitude"]))
 
-            for row in reader:
-                # SAVEPOINT : si cette ligne plante, on ne perd que
-                # cette ligne, pas tout ce qui a été inséré avant dans
-                # la transaction en cours.
-                cur.execute("SAVEPOINT row_sp")
-                try:
-                    city_id = get_or_create_city(cur, row["city"])
-                    dt = datetime.fromisoformat(row["timestamp"])
-                    time_id = get_or_create_time(cur, dt)
-
-                    cur.execute(
-                        """
-                        INSERT INTO fact_aqi (
-                            id_city, id_time, pm10, pm2_5, carbon_monoxide,
-                            nitrogen_dioxide, sulphur_dioxide, ozone, us_aqi
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (id_city, id_time) DO NOTHING
-                        """,
-                        (
-                            city_id, time_id,
-                            float(row["pm10"]) if row["pm10"] else None,
-                            float(row["pm2_5"]) if row["pm2_5"] else None,
-                            float(row["carbon_monoxide"]) if row["carbon_monoxide"] else None,
-                            float(row["nitrogen_dioxide"]) if row["nitrogen_dioxide"] else None,
-                            float(row["sulphur_dioxide"]) if row["sulphur_dioxide"] else None,
-                            float(row["ozone"]) if row["ozone"] else None,
-                            int(float(row["us_aqi"])) if row["us_aqi"] else None,
-                        ),
-                    )
-                    if cur.rowcount == 0:
-                        ignores += 1
-                    else:
-                        total += 1
-
-                    cur.execute("RELEASE SAVEPOINT row_sp")
-
-                    if (total + ignores) % 500 == 0:
-                        conn.commit()
-                        print(f"  {total} lignes chargées, {ignores} doublons ignorés...")
-
-                except Exception as e:
-                    # On annule UNIQUEMENT cette ligne, pas toute la transaction
-                    cur.execute("ROLLBACK TO SAVEPOINT row_sp")
-                    erreurs += 1
-                    print(f"  [IGNORÉ] Ligne avec erreur : {e}")
-                    continue
-
+        execute_values(
+            cur,
+            """
+            INSERT INTO dim_city (city_name, country, latitude, longitude)
+            VALUES %s
+            ON CONFLICT (city_name) DO NOTHING
+            """,
+            city_rows,
+        )
         conn.commit()
-        print(f"\n[OK] {total} faits insérés, {ignores} doublons ignorés, {erreurs} lignes en erreur.")
+
+        cur.execute("SELECT id_city, city_name FROM dim_city")
+        city_id_map = {name: cid for cid, name in cur.fetchall()}
+        print(f"  {len(city_id_map)} villes en base.")
+
+        # ------------------------------------------------------------
+        # 2) Temps : une ligne par horodatage unique du CSV, en masse
+        # ------------------------------------------------------------
+        print("Chargement de la dimension temps...")
+        unique_timestamps = df["timestamp"].drop_duplicates().sort_values()
+
+        time_rows = []
+        for dt in unique_timestamps:
+            dt = dt.to_pydatetime()
+            time_rows.append((
+                dt, dt.date(), dt.hour, dt.day, dt.month, dt.year,
+                dt.strftime("%A"), dt.weekday() >= 5,
+            ))
+
+        execute_values(
+            cur,
+            """
+            INSERT INTO dim_time (
+                full_datetime, date, hour, day, month, year, day_of_week, is_weekend
+            ) VALUES %s
+            ON CONFLICT (full_datetime) DO NOTHING
+            """,
+            time_rows,
+            page_size=1000,
+        )
+        conn.commit()
+
+        cur.execute("SELECT id_time, full_datetime FROM dim_time")
+        time_id_map = {ts: tid for tid, ts in cur.fetchall()}
+        print(f"  {len(time_id_map)} horodatages en base.")
+
+        # ------------------------------------------------------------
+        # 3) Faits : en masse, avec ON CONFLICT DO NOTHING
+        # ------------------------------------------------------------
+        print("Chargement des faits...")
+        fact_rows = []
+        ignores_ville_inconnue = 0
+
+        for row in df.itertuples(index=False):
+            city_id = city_id_map.get(row.city)
+            if city_id is None:
+                ignores_ville_inconnue += 1
+                continue
+            dt = row.timestamp.to_pydatetime()
+            time_id = time_id_map.get(dt)
+            if time_id is None:
+                continue
+
+            def clean_val(v):
+                return None if pd.isna(v) else float(v)
+
+            fact_rows.append((
+                city_id, time_id,
+                clean_val(row.pm10),
+                clean_val(row.pm2_5),
+                clean_val(row.carbon_monoxide),
+                clean_val(row.nitrogen_dioxide),
+                clean_val(row.sulphur_dioxide),
+                clean_val(row.ozone),
+                None if pd.isna(row.us_aqi) else int(row.us_aqi),
+            ))
+
+        before = _count_facts(cur)
+
+        execute_values(
+            cur,
+            """
+            INSERT INTO fact_aqi (
+                id_city, id_time, pm10, pm2_5, carbon_monoxide,
+                nitrogen_dioxide, sulphur_dioxide, ozone, us_aqi
+            ) VALUES %s
+            ON CONFLICT (id_city, id_time) DO NOTHING
+            """,
+            fact_rows,
+            page_size=1000,
+        )
+        conn.commit()
+
+        after = _count_facts(cur)
+        inseres = after - before
+        doublons = len(fact_rows) - inseres
+
+        print(f"\n[OK] {inseres} nouveaux faits insérés, {doublons} doublons ignorés"
+              f"{f', {ignores_ville_inconnue} lignes avec ville inconnue' if ignores_ville_inconnue else ''}.")
 
     except Exception as e:
         conn.rollback()
-        print(f"[ERREUR FATALE] {e}")
+        print(f"[ERREUR] {e}")
         sys.exit(1)
     finally:
         cur.close()
         conn.close()
+
+
+def _count_facts(cur):
+    cur.execute("SELECT COUNT(*) FROM fact_aqi")
+    return cur.fetchone()[0]
 
 
 if __name__ == "__main__":
