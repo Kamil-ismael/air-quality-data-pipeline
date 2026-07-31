@@ -32,5 +32,5 @@
 
 ## Difficultés rencontrées et solutions
 
-- **Fiabilité du déclenchement horaire.** Le scheduler natif de GitHub Actions (`cron`) ne se déclenchait pas de façon suffisamment précise (retards observés). Solution retenue : déclenchement via un service de cron externe appelant `workflow_dispatch` par l'API GitHub. 
+- **Fiabilité du déclenchement horaire.** Le planificateur natif de GitHub Actions (`schedule` basé sur `cron`) présentait des retards de déclenchement, ce qui ne répondait pas aux exigences de collecte à des horaires précis. Pour garantir une exécution plus fiable, nous avons remplacé ce mécanisme par **cron-job.org**, un service de planification externe qui déclenche le workflow GitHub via l'événement `workflow_dispatch` en utilisant l'API GitHub.
 - **Cohérence entre plusieurs pistes d'orchestrateur explorées.** Le groupe a testé une piste less-code (n8n) en parallèle de la piste Python/GitHub Actions avant de trancher pour la seconde. L'orchéstration via n8n était simplifiée mais il y a eu quelques difficultés au cours du partage de projet, ce qui a valu de retenir Github Actions comme Orchestrateur final. 
