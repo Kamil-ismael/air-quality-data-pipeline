@@ -2,6 +2,16 @@
 
 ## Équipe
 
+- Ismael [STD24030]
+
+- Jose [STD24132]
+
+- Antonio [STD24124]
+
+- Lionel [STD24059]
+
+- Vahatra [STD24104]
+
 | Membres | Rôle principal sur le projet répartition des tâches |
 |---|---|
 | [Ismael] | [collecte + backfill] |
