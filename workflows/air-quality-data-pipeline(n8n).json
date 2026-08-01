@@ -5,21 +5,25 @@
       "parameters": {
         "rule": {
           "interval": [
-            {
-              "field": "hours",
-              "hoursInterval": 3
-            }
+            { "field": "hours", "hoursInterval": 3 }
           ]
         }
       },
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
-      "position": [
-        32,
-        -48
-      ],
-      "id": "0f93623b-b355-462e-9a6b-1e36dc3ce75a",
+      "position": [32, -48],
+      "id": "trigger",
       "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const config = {\n  baseDir: 'C:\\\\Users\\\\WINDOWS 10\\\\Documents\\\\n8n-datalake\\\\raw'\n};\n\nreturn [\n  { city: \"Antananarivo\", lat: -18.8792, lon: 47.5079, baseDir: config.baseDir },\n  { city: \"Toamasina\", lat: -18.1492, lon: 49.4023, baseDir: config.baseDir },\n  { city: \"Mahajanga\", lat: -15.7167, lon: 46.3167, baseDir: config.baseDir },\n  { city: \"Fianarantsoa\", lat: -21.4536, lon: 47.0858, baseDir: config.baseDir },\n  { city: \"Antsiranana\", lat: -12.2793, lon: 49.2917, baseDir: config.baseDir }\n].map(item => ({ json: item }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, -48],
+      "id": "city",
+      "name": "city"
     },
     {
       "parameters": {
@@ -27,140 +31,56 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            {
-              "name": "latitude",
-              "value": "={{ $json.lat }}"
-            },
-            {
-              "name": "longitude",
-              "value": "={{ $json.lon }}"
-            },
-            {
-              "name": "hourly",
-              "value": "pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,european_aqi"
-            },
-            {
-              "name": "past_days",
-              "value": "1"
-            },
-            {
-              "name": "forcast_days",
-              "value": "1"
-            }
+            { "name": "latitude", "value": "={{ $json.lat }}" },
+            { "name": "longitude", "value": "={{ $json.lon }}" },
+            { "name": "hourly", "value": "pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,european_aqi" },
+            { "name": "past_days", "value": "1" },
+            { "name": "forecast_days", "value": "1" }
           ]
-        },
-        "options": {
-          "allowUnauthorizedCerts": true
         }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
-      "position": [
-        448,
-        -48
-      ],
-      "id": "1d2c40fa-29d2-4ff4-b323-e96f077032c5",
+      "position": [448, -48],
+      "id": "http",
       "name": "HTTP Request"
     },
     {
       "parameters": {
-        "jsCode": "const fs = require('fs');\nconst path = require('path');\n\nconst items = $input.all();\nconst villesItems = $('city').all();\n\nreturn items.map((item, index) => {\n  const cityData = villesItems[index].json;\n  const city = cityData.city.trim();\n  const baseDir = cityData.baseDir;\n\n  const now = new Date();\n  const timestamp = now.toISOString().replace(/[:.]/g, '-');\n\n  const year = now.getFullYear();\n  const month = String(now.getMonth() + 1).padStart(2, '0');\n  const day = String(now.getDate()).padStart(2, '0');\n\n  const dirPath = path.join(baseDir, city, String(year), month, day);\n  fs.mkdirSync(dirPath, { recursive: true });\n\n  const fileName = `${city}_${timestamp}.json`;\n  const fullPath = path.join(dirPath, fileName);\n\n  const rawRecord = {\n    city: city,\n    ingestion_timestamp: now.toISOString(),\n    raw_payload: item.json\n  };\n\n  fs.writeFileSync(fullPath, JSON.stringify(rawRecord, null, 2), 'utf-8');\n\n  return {\n    json: {\n      fullPath: fullPath,\n      city: city,\n      raw_payload: item.json\n    }\n  };\n});"
+        "jsCode": "const items = $input.all();\n\n// Fusionner la ville avec la réponse API\nreturn items.map(item => {\n  return {\n    json: {\n      ...item.json,\n      city: item.json.city || item.json.city_name || \"Unknown\",\n      baseDir: item.json.baseDir || 'C:\\\\Users\\\\WINDOWS 10\\\\Documents\\\\n8n-datalake\\\\raw'\n    }\n  };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        656,
-        -48
-      ],
-      "id": "65a54291-0309-43e8-b0a9-1f66ec565d72",
+      "position": [560, -48],
+      "id": "merge",
+      "name": "Fusion Ville + API"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  const city = (item.json.city || \"Unknown\").trim();\n  const baseDir = item.json.baseDir;\n\n  const now = new Date();\n  const timestamp = now.toISOString().replace(/[:.]/g, '-');\n\n  const year = now.getFullYear();\n  const month = String(now.getMonth() + 1).padStart(2, '0');\n  const day = String(now.getDate()).padStart(2, '0');\n\n  const dirPath = `${baseDir}/${city}/${year}/${month}/${day}`;\n  const fileName = `${city}_${timestamp}.json`;\n  const fullPath = `${dirPath}/${fileName}`;\n\n  return {\n    json: {\n      fullPath,\n      city,\n      raw_payload: item.json\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [656, -48],
+      "id": "raw",
       "name": "RAW+Dossiers"
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.item.json;\nconst raw = item.raw_payload || item;\nconst hourly = raw.hourly;\nconst city = (item.city || raw.city).trim();\nconst cityClean = city.charAt(0).toUpperCase() + city.slice(1).toLowerCase();\n\nconst now = new Date();\n\nconst records = hourly.time.map((timestamp, i) => ({\n  city: cityClean,\n  timestamp: timestamp,\n  pm10: hourly.pm10 ? hourly.pm10[i] : null,\n  pm2_5: hourly.pm2_5 ? hourly.pm2_5[i] : null,\n  co: hourly.carbon_monoxide ? hourly.carbon_monoxide[i] : null,\n  no2: hourly.nitrogen_dioxide ? hourly.nitrogen_dioxide[i] : null,\n  so2: hourly.sulphur_dioxide ? hourly.sulphur_dioxide[i] : null,\n  ozone: hourly.ozone ? hourly.ozone[i] : null,\n  european_aqi: hourly.european_aqi ? hourly.european_aqi[i] : null,\n}));\n\n\nconst pastOnly = records.filter(r => new Date(r.timestamp) <= now);\n\n// Filtrage des valeurs critiques manquantes\nconst cleaned = pastOnly.filter(r => r.pm2_5 !== null && r.pm10 !== null);\n\n// Dédoublonnage \nconst seen = new Set();\nconst deduped = cleaned.filter(r => {\n  const key = `${r.city}_${r.timestamp}`;\n  if (seen.has(key)) return false;\n  seen.add(key);\n  return true;\n});\n\nreturn deduped.map(r => ({ json: r }));"
+        "jsCode": "const item = $input.item.json;\nconst raw = item.raw_payload || item;\nconst hourly = raw.hourly;\nconst city = (item.city || \"Unknown\").trim();\nconst cityClean = city.charAt(0).toUpperCase() + city.slice(1).toLowerCase();\n\nconst now = new Date();\n\nconst records = hourly.time.map((timestamp, i) => ({\n  city: cityClean,\n  timestamp: timestamp,\n  pm10: hourly.pm10 ? hourly.pm10[i] : null,\n  pm2_5: hourly.pm2_5 ? hourly.pm2_5[i] : null,\n  co: hourly.carbon_monoxide ? hourly.carbon_monoxide[i] : null,\n  no2: hourly.nitrogen_dioxide ? hourly.nitrogen_dioxide[i] : null,\n  so2: hourly.sulphur_dioxide ? hourly.sulphur_dioxide[i] : null,\n  ozone: hourly.ozone ? hourly.ozone[i] : null,\n  european_aqi: hourly.european_aqi ? hourly.european_aqi[i] : null,\n}));\n\nconst pastOnly = records.filter(r => new Date(r.timestamp) <= now);\nconst cleaned = pastOnly.filter(r => r.pm2_5 !== null && r.pm10 !== null);\n\nconst seen = new Set();\nconst deduped = cleaned.filter(r => {\n  const key = `${r.city}_${r.timestamp}`;\n  if (seen.has(key)) return false;\n  seen.add(key);\n  return true;\n});\n\nreturn deduped.map(r => ({ json: r }));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        896,
-        -48
-      ],
-      "id": "23d2bff6-cea0-4c03-9e04-8dbd888a8355",
+      "position": [896, -48],
+      "id": "clean",
       "name": "Nettoyage et dédoublonnage"
-    },
-    {
-      "parameters": {
-        "jsCode": "const config = {\n  baseDir: 'C:\\\\n8n-datalake\\\\raw'  // ⚠️ Chaque collaborateur adapte SEULEMENT cette ligne\n};\n\nreturn [\n  { city: \"Antananarivo\", lat: -18.8792, lon: 47.5079, baseDir: config.baseDir },\n  { city: \"Toamasina\", lat: -18.1492, lon: 49.4023, baseDir: config.baseDir },\n  { city: \"Mahajanga\", lat: -15.7167, lon: 46.3167, baseDir: config.baseDir },\n  { city: \"Fianarantsoa\", lat: -21.4536, lon: 47.0858, baseDir: config.baseDir },\n  { city: \"Antsiranana\", lat: -12.2793, lon: 49.2917, baseDir: config.baseDir }\n].map(item => ({ json: item }));"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        240,
-        -48
-      ],
-      "id": "9dbc344d-8a74-422a-9cec-1b7dca1e2773",
-      "name": "city"
     }
   ],
-  "pinData": {},
   "connections": {
-    "Schedule Trigger": {
-      "main": [
-        [
-          {
-            "node": "city",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "HTTP Request": {
-      "main": [
-        [
-          {
-            "node": "RAW+Dossiers",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "RAW+Dossiers": {
-      "main": [
-        [
-          {
-            "node": "Nettoyage et dédoublonnage",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "city": {
-      "main": [
-        [
-          {
-            "node": "HTTP Request",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
-  },
-  "active": false,
-  "settings": {
-    "executionOrder": "v1",
-    "binaryMode": "separate",
-    "availableInMCP": false
-  },
-  "versionId": "21e61ac1-90dd-4119-83a1-ab1c55ad3096",
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "534bdca62cc21f547eb3c499fa7992706e8fa71e540eb3b2b10e201095615f8e"
-  },
-  "nodeGroups": [],
-  "id": "BK6ivmO6nq3iu2b2",
-  "tags": []
+    "Schedule Trigger": { "main": [[{ "node": "city", "type": "main", "index": 0 }]] },
+    "city": { "main": [[{ "node": "HTTP Request", "type": "main", "index": 0 }]] },
+    "HTTP Request": { "main": [[{ "node": "Fusion Ville + API", "type": "main", "index": 0 }]] },
+    "Fusion Ville + API": { "main": [[{ "node": "RAW+Dossiers", "type": "main", "index": 0 }]] },
+    "RAW+Dossiers": { "main": [[{ "node": "Nettoyage et dédoublonnage", "type": "main", "index": 0 }]] }
+  }
 }
