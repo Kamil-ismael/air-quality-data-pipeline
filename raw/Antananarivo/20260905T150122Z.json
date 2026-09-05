@@ -1,0 +1,53 @@
+{
+  "latitude": -18.900002,
+  "longitude": 47.5,
+  "generationtime_ms": 0.4137754440307617,
+  "utc_offset_seconds": 10800,
+  "timezone": "Indian/Antananarivo",
+  "timezone_abbreviation": "GMT+3",
+  "elevation": 1252.0,
+  "hourly_units": {
+    "time": "iso8601",
+    "pm10": "μg/m³",
+    "pm2_5": "μg/m³",
+    "carbon_monoxide": "μg/m³",
+    "nitrogen_dioxide": "μg/m³",
+    "sulphur_dioxide": "μg/m³",
+    "ozone": "μg/m³",
+    "us_aqi": "USAQI"
+  },
+  "hourly": {
+    "time": [
+      "2026-09-05T17:00",
+      "2026-09-05T18:00"
+    ],
+    "pm10": [
+      5.3,
+      6.1
+    ],
+    "pm2_5": [
+      3.8,
+      4.6
+    ],
+    "carbon_monoxide": [
+      97.0,
+      102.0
+    ],
+    "nitrogen_dioxide": [
+      0.7,
+      1.1
+    ],
+    "sulphur_dioxide": [
+      1.0,
+      1.1
+    ],
+    "ozone": [
+      65.0,
+      61.0
+    ],
+    "us_aqi": [
+      33,
+      33
+    ]
+  }
+}
